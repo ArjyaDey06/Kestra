@@ -373,3 +373,9 @@ Later:    Scheduling → Retries → Failure handling → Notifications → BI
 ```
 
 This README will grow as additional pipeline features and learning examples are added.
+
+---
+
+## Author
+
+**Arjya Dey**
