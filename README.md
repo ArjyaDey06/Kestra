@@ -1,39 +1,48 @@
 # Kestra E-Commerce Data Engineering Pipeline
 
-A beginner-friendly, hands-on project for learning [Kestra](https://kestra.io/) by building an end-to-end e-commerce ETL pipeline.
+A beginner-friendly, hands-on project for learning [Kestra](https://kestra.io/) by building an e-commerce data pipeline from ingestion to SQL analytics.
 
-The project demonstrates workflow orchestration, CSV and REST API ingestion, data cleaning, multi-source joins, enrichment, analytics, observability, and debugging.
+The project demonstrates:
 
-> **Current status:** The pipeline currently extracts data, transforms it with Python and Pandas, and writes an enriched CSV artifact. SQL loading, scheduling, retries, notifications, and production deployment are planned next.
+- CSV and REST API ingestion
+- Data cleaning and validation
+- Multi-source joins and enrichment
+- Python and Pandas transformations
+- SQLite database loading
+- SQL analytics
+- Scheduled executions
+- Retries and failure handling
+- Kestra outputs, logs, executions, and observability
+
+> **Current checkpoint:** Extract, Transform, Load, SQLite, SQL analytics, scheduling, retries, failure handling, artifact management, and observability are complete. Data quality checks are the next planned feature.
 
 ## Table of contents
 
-- [Project goal](#project-goal)
+- [Project overview](#project-overview)
 - [Architecture](#architecture)
 - [Learning path](#learning-path)
 - [Prerequisites](#prerequisites)
 - [Run Kestra locally](#run-kestra-locally)
-- [Run the pipeline](#run-the-pipeline)
+- [Part 1: Build the enriched CSV pipeline](#part-1-build-the-enriched-csv-pipeline)
+- [Part 2: Load SQLite and add reliability](#part-2-load-sqlite-and-add-reliability)
 - [Current working flow](#current-working-flow)
-- [Expected behavior](#expected-behavior)
+- [Expected results](#expected-results)
 - [Kestra concepts](#kestra-concepts)
 - [Troubleshooting lessons](#troubleshooting-lessons)
-- [ETL perspective](#etl-perspective)
 - [Limitations and next steps](#limitations-and-next-steps)
+- [Author](#author)
 
-## Project goal
+## Project overview
 
-We are acting as data engineers for an e-commerce company with two data sources:
+We act as data engineers for an e-commerce company with two sources.
 
-### Source 1: Order data
-
-The order source contains:
+### Orders CSV
 
 ```text
-order_id, product_id, quantity
+order_id,product_id,quantity
 ```
 
-### Source 2: Product REST API
+### Product REST API
 
 Product details come from the [DummyJSON Products API](https://dummyjson.com/products):
 
@@ -41,94 +50,90 @@ Product details come from the [DummyJSON Products API](https://dummyjson.com/pro
 id, title, category, price
 ```
 
-The pipeline uses `product_id` from the orders and `id` from the API as the common join key.
+The pipeline matches `orders.product_id` with `products.id`, then produces enriched order records containing:
+
+```text
+order_id, product_id, quantity, title, category, price, revenue
+```
 
 ## Architecture
 
 ```text
-                         ┌─────────────────────┐
-                         │  Orders CSV source   │
-                         └──────────┬──────────┘
-                                    │
-                                    ▼
-                         ┌─────────────────────┐
-                         │    create_orders    │
-                         └──────────┬──────────┘
-                                    │
-                                    │
-┌─────────────────────┐             │
-│  DummyJSON REST API │             │
-└──────────┬──────────┘             │
-           ▼                        │
-┌─────────────────────┐             │
-│ fetch_product_data  │             │
-└──────────┬──────────┘             │
-           ▼                        │
-┌─────────────────────┐             │
-│ inspect_product_data│             │
-└──────────┬──────────┘             │
-           └──────────────┬─────────┘
+Orders CSV ───────────────┐
                           ▼
-                 ┌─────────────────┐
-                 │   clean_orders  │
-                 │                 │
-                 │ • deduplicate   │
-                 │ • validate      │
-                 │ • join          │
-                 │ • enrich        │
-                 │ • calculate     │
-                 │   revenue       │
-                 └────────┬────────┘
+                    create_orders
+                          │
+                          │
+DummyJSON API ──► fetch_product_data
+                          │
+                   inspect_product_data
+                          │
                           ▼
-                 ┌─────────────────┐
-                 │ clean_orders.csv│
-                 └────────┬────────┘
+                    clean_orders
+              clean, validate, join,
+              enrich, calculate revenue
+                          │
                           ▼
-                 ┌─────────────────┐
-                 │  analyze_orders │
-                 └────────┬────────┘
+                   clean_orders.csv
+                          │
                           ▼
-                 ┌─────────────────┐
-                 │processing_complete│
-                 └─────────────────┘
+                  load_to_database
+                          │
+                          ▼
+                    ecommerce.db
+                   orders table
+                          │
+                          ▼
+                    sql_analytics
+                          │
+                          ▼
+                   Business insights
+                          │
+                          ▼
+                   processing_complete
+
+If the API or another task fails:
+
+             retries → pipeline_failed → alert log
+
+The complete flow can also be started automatically by a two-minute schedule.
 ```
 
 ## Learning path
 
-The project was built incrementally. Each stage introduces one data-engineering or orchestration concept:
+The project was built incrementally so each stage introduces one concept:
 
-1. **Hello Kestra** — create a flow with simple log tasks.
-2. **Create actual data** — generate an orders CSV with `storage.Write`.
-3. **Introduce data-quality problems** — add a duplicate order and an invalid quantity.
-4. **Use Python and Pandas** — read and transform task outputs.
-5. **Clean the data** — remove duplicates and invalid records.
-6. **Pass outputs between tasks** — use Kestra expressions to connect tasks.
-7. **Create a data artifact** — write `clean_orders.csv` as an output file.
-8. **Calculate analytics** — compute order count, revenue, average order value, and top product.
-9. **Ingest a REST API** — fetch product details from DummyJSON.
-10. **Inspect JSON** — extract API fields with `jq`.
-11. **Join multiple sources** — match `product_id` to the API's `id`.
-12. **Enrich and calculate** — add product details and calculate revenue using the API price.
-13. **Debug failures** — fix an invalid Kestra expression and a Pandas schema mismatch.
-
-The current checkpoint is an end-to-end enriched analytics pipeline.
+1. Create a simple Kestra flow with log tasks.
+2. Generate an orders CSV with `storage.Write`.
+3. Add duplicate and invalid records deliberately.
+4. Use Python and Pandas to clean the data.
+5. Pass files between tasks with Kestra output expressions.
+6. Fetch product data from a REST API.
+7. Inspect JSON with `jq`.
+8. Join orders with product metadata.
+9. Enrich orders and calculate revenue.
+10. Write the result to `clean_orders.csv`.
+11. Load the enriched CSV into SQLite.
+12. Query the SQLite table using SQL.
+13. Schedule the workflow with a cron trigger.
+14. Add retries for temporary failures.
+15. Add a flow-level error handler for unrecoverable failures.
+16. Expose `ecommerce.db` as an output artifact for downstream tasks.
 
 ## Prerequisites
-
-Only a small local setup is required:
 
 - Windows
 - Docker Desktop
 - Docker Desktop configured to use the WSL 2 backend
-- Internet access for the DummyJSON API request
+- Internet access for the DummyJSON API
 
-A Docker account/sign-in is not required for this local setup.
+A Docker account is not required for this local setup.
 
 ## Run Kestra locally
 
 1. Install and start [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
 2. Wait until the Docker Engine is running.
-3. Confirm Docker is available from PowerShell:
+3. Open PowerShell and verify Docker:
 
    ```powershell
    docker --version
@@ -150,20 +155,281 @@ A Docker account/sign-in is not required for this local setup.
 5. Open [http://localhost:8080](http://localhost:8080).
 6. Create the local administrator account when prompted.
 
-## Run the pipeline
+## Part 1: Build the enriched CSV pipeline
 
-In the Kestra UI:
+Part 1 builds the Extract and Transform stages:
 
-1. Create or open the namespace `dsa.dataengineering`.
-2. Create a flow with the ID `ecommerce_pipeline`.
-3. Paste the [complete flow](#current-working-flow) below into the editor.
-4. Save the flow.
-5. Select **Execute**.
-6. Open the execution to inspect task status, logs, outputs, and the Gantt view.
+```text
+Orders CSV + Product REST API
+            ↓
+     Clean and validate
+            ↓
+       Join and enrich
+            ↓
+    Calculate order revenue
+            ↓
+      clean_orders.csv
+            ↓
+        Sales analytics
+```
+
+The sample orders intentionally include:
+
+- Duplicate order `1002`.
+- Invalid order `1005` with a negative quantity.
+
+The `clean_orders` task removes duplicate order IDs, filters out quantities less than or equal to zero, joins product details using `product_id`, and calculates:
+
+```text
+revenue = quantity × price
+```
+
+At the end of Part 1, the transformed data is available as `clean_orders.csv`. Part 2 loads that artifact into SQLite and adds operational reliability.
+
+## Part 2: Load SQLite and add reliability
+
+### 1. Test SQLite first
+
+Before loading the real dataset, create a small test task. This confirms that Python can create a database, execute SQL, insert rows, and read them back.
+
+```yaml
+- id: test_database
+  type: io.kestra.plugin.scripts.python.Script
+  script: |
+    import sqlite3
+
+    connection = sqlite3.connect("ecommerce.db")
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS test_table (
+            id INTEGER,
+            message TEXT
+        )
+    """)
+
+    cursor.execute("""
+        INSERT INTO test_table
+        VALUES (1, 'Database connection successful')
+    """)
+
+    connection.commit()
+
+    rows = cursor.execute(
+        "SELECT * FROM test_table"
+    ).fetchall()
+
+    print("DATABASE RESULTS:")
+    print(rows)
+    connection.close()
+```
+
+Add this task after `clean_orders`, save the flow, execute it, and inspect the task logs. Once it succeeds, remove it before using the complete flow below.
+
+### 2. Load the transformed data into SQLite
+
+The `load_to_database` task reads the CSV produced by `clean_orders` and writes it to a SQLite table named `orders`.
+
+```yaml
+- id: load_to_database
+  type: io.kestra.plugin.scripts.python.Script
+  beforeCommands:
+    - pip install pandas
+  script: |
+    import pandas as pd
+    import sqlite3
+
+    df = pd.read_csv(
+        "{{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}"
+    )
+
+    print("DATA TO BE LOADED:")
+    print(df)
+
+    connection = sqlite3.connect("ecommerce.db")
+
+    df.to_sql(
+        "orders",
+        connection,
+        if_exists="replace",
+        index=False
+    )
+
+    print("\nData successfully loaded into SQL database!")
+
+    result = pd.read_sql("SELECT * FROM orders", connection)
+    print("\nDATA FROM DATABASE:")
+    print(result)
+
+    connection.close()
+  outputFiles:
+    - "ecommerce.db"
+```
+
+The expression below passes the CSV artifact from the previous task:
+
+```text
+{{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}
+```
+
+`if_exists: replace` is useful while learning because every run creates a predictable table from the latest transformed data. Production pipelines may instead use append, upsert, merge, incremental loading, or change-data-capture patterns.
+
+The `outputFiles` declaration is important. It tells Kestra to store the database file as a task artifact so that downstream tasks can consume it explicitly.
+
+```text
+load_to_database
+        ↓
+creates ecommerce.db
+        ↓
+outputFiles
+        ↓
+Kestra-managed artifact
+        ↓
+sql_analytics
+```
+
+### 3. Query the database with SQL
+
+Add `sql_analytics` after `load_to_database`:
+
+```yaml
+- id: sql_analytics
+  type: io.kestra.plugin.scripts.python.Script
+  script: |
+    import sqlite3
+
+    connection = sqlite3.connect(
+        "{{ outputs.load_to_database.outputFiles['ecommerce.db'] }}"
+    )
+    cursor = connection.cursor()
+
+    print("===== SQL ANALYTICS =====")
+
+    cursor.execute("""
+        SELECT SUM(revenue)
+        FROM orders
+    """)
+    print("Total Revenue:", cursor.fetchone()[0])
+
+    cursor.execute("""
+        SELECT category, SUM(revenue) AS total_revenue
+        FROM orders
+        GROUP BY category
+        ORDER BY total_revenue DESC
+    """)
+
+    print("\nRevenue by Category:")
+    for row in cursor.fetchall():
+        print(row)
+
+    cursor.execute("""
+        SELECT title, SUM(revenue) AS total_revenue
+        FROM orders
+        GROUP BY title
+        ORDER BY total_revenue DESC
+        LIMIT 1
+    """)
+
+    print("\nTop Product:")
+    print(cursor.fetchone())
+    connection.close()
+```
+
+This task answers three business questions:
+
+- What is the total revenue?
+- Which categories generate the most revenue?
+- Which product generated the most revenue?
+
+It introduces `SUM`, `GROUP BY`, `ORDER BY`, aliases, and `LIMIT` in a real pipeline context.
+
+### 4. Schedule the flow
+
+Add `triggers` at the root level of the flow. Do not place it inside `tasks`:
+
+```yaml
+triggers:
+  - id: every_two_minutes
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "*/2 * * * *"
+```
+
+The expression `*/2 * * * *` means every two minutes. After saving the flow, open **Kestra → Executions** and watch for new executions to appear automatically.
+
+For experimentation, you can comment out or remove the trigger and execute the flow manually. This is especially useful while testing intentional failures.
+
+### 5. Add retries for temporary failures
+
+Retries are useful for transient network, API, database, or service problems.
+
+Add this configuration to `fetch_product_data`:
+
+```yaml
+- id: fetch_product_data
+  type: io.kestra.plugin.core.http.Request
+  uri: https://dummyjson.com/products
+  method: GET
+  retry:
+    type: constant
+    interval: PT5S
+    maxAttempts: 3
+```
+
+This means Kestra waits five seconds between attempts and allows a maximum of three attempts.
+
+To observe the behavior safely:
+
+1. Disable the two-minute trigger temporarily.
+2. Change the URI to `https://dummyjson.com/this-does-not-exist`.
+3. Save and execute manually.
+4. Watch the task fail, wait, retry, and eventually exhaust its attempts.
+5. Restore `https://dummyjson.com/products` afterward.
+
+> **Important:** The property is `maxAttempts`, not `maxAttempt`. The singular form causes a flow validation error before execution starts.
+
+### 6. Add failure handling
+
+Retries handle temporary failures. An error handler defines what happens after retries are exhausted.
+
+Add `errors` at the root level, alongside `tasks` and `triggers`:
+
+```yaml
+errors:
+  - id: pipeline_failed
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      ALERT: E-commerce pipeline failed.
+      Execution ID: {{ execution.id }}
+      Please check the Kestra execution logs.
+```
+
+The hierarchy should look like this:
+
+```yaml
+id: ecommerce_pipeline
+namespace: dsa.dataengineering
+
+tasks:
+  # normal tasks
+
+errors:
+  # failure tasks
+
+triggers:
+  # schedules
+```
+
+Test the handler by temporarily using the invalid API URI again. The expected lifecycle is:
+
+```text
+Task fails → retry → retry → retries exhausted → pipeline_failed
+```
+
+In a production workflow, the error handler could send an email or Slack message, create an incident, record failure metadata, or trigger a recovery workflow. Here it writes an alert to the Kestra logs.
 
 ## Current working flow
 
-This is the current checkpoint version of the pipeline.
+Use this flow as the Part 2 checkpoint. It includes the complete pipeline, SQLite loading, SQL analytics, retries, failure handling, and scheduling.
 
 ```yaml
 id: ecommerce_pipeline
@@ -190,6 +456,10 @@ tasks:
     type: io.kestra.plugin.core.http.Request
     uri: https://dummyjson.com/products
     method: GET
+    retry:
+      type: constant
+      interval: PT5S
+      maxAttempts: 3
 
   - id: inspect_product_data
     type: io.kestra.plugin.core.log.Log
@@ -211,27 +481,74 @@ tasks:
       products_json = json.loads(r'''{{ outputs.fetch_product_data.body }}''')
       products = pd.DataFrame(products_json["products"])
 
-      print("RAW ORDERS")
-      print(orders)
-
-      # Remove duplicate orders and invalid quantities.
       orders = orders.drop_duplicates(subset=["order_id"])
       orders = orders[orders["quantity"] > 0]
 
-      # Keep and standardize the product fields needed for the join.
       products = products[["id", "title", "category", "price"]]
       products = products.rename(columns={"id": "product_id"})
 
-      # Enrich orders with product details.
       enriched = orders.merge(products, on="product_id", how="left")
       enriched["revenue"] = enriched["quantity"] * enriched["price"]
-
-      print("\nENRICHED ORDERS")
-      print(enriched)
-
       enriched.to_csv("clean_orders.csv", index=False)
+
+      print("ENRICHED ORDERS")
+      print(enriched)
     outputFiles:
       - "clean_orders.csv"
+
+  - id: load_to_database
+    type: io.kestra.plugin.scripts.python.Script
+    beforeCommands:
+      - pip install pandas
+    script: |
+      import pandas as pd
+      import sqlite3
+
+      df = pd.read_csv(
+          "{{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}"
+      )
+
+      connection = sqlite3.connect("ecommerce.db")
+      df.to_sql("orders", connection, if_exists="replace", index=False)
+
+      print("Data successfully loaded into SQL database!")
+      print(pd.read_sql("SELECT * FROM orders", connection))
+      connection.close()
+    outputFiles:
+      - "ecommerce.db"
+
+  - id: sql_analytics
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import sqlite3
+
+      connection = sqlite3.connect(
+          "{{ outputs.load_to_database.outputFiles['ecommerce.db'] }}"
+      )
+      cursor = connection.cursor()
+
+      cursor.execute("SELECT SUM(revenue) FROM orders")
+      print("Total Revenue:", cursor.fetchone()[0])
+
+      cursor.execute("""
+          SELECT category, SUM(revenue) AS total_revenue
+          FROM orders
+          GROUP BY category
+          ORDER BY total_revenue DESC
+      """)
+      print("Revenue by Category:")
+      for row in cursor.fetchall():
+          print(row)
+
+      cursor.execute("""
+          SELECT title, SUM(revenue) AS total_revenue
+          FROM orders
+          GROUP BY title
+          ORDER BY total_revenue DESC
+          LIMIT 1
+      """)
+      print("Top Product:", cursor.fetchone())
+      connection.close()
 
   - id: analyze_orders
     type: io.kestra.plugin.scripts.python.Script
@@ -244,137 +561,146 @@ tasks:
           "{{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}"
       )
 
-      total_revenue = df["revenue"].sum()
-      total_orders = len(df)
-      average_order_value = total_revenue / total_orders
-      top_product = df.loc[df["revenue"].idxmax(), "title"]
-
-      print("===== SALES ANALYTICS =====")
-      print("Total Orders:", total_orders)
-      print("Total Revenue:", total_revenue)
-      print("Average Order Value:", average_order_value)
-      print("Highest Revenue Product:", top_product)
+      print("Total Orders:", len(df))
+      print("Average Order Value:", df["revenue"].sum() / len(df))
 
   - id: processing_complete
     type: io.kestra.plugin.core.log.Log
     message: "E-commerce data pipeline completed successfully."
+
+errors:
+  - id: pipeline_failed
+    type: io.kestra.plugin.core.log.Log
+    message: |
+      ALERT: E-commerce pipeline failed.
+      Execution ID: {{ execution.id }}
+      Please check the Kestra execution logs.
+
+triggers:
+  - id: every_two_minutes
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "*/2 * * * *"
 ```
 
-## Expected behavior
+To run it manually, create or open the namespace `dsa.dataengineering`, create the flow `ecommerce_pipeline`, paste the YAML, save it, and select **Execute**. To test scheduling, leave the trigger enabled and watch the executions page.
 
-The sample input intentionally includes:
+## Expected results
 
-- A duplicate record for order `1002`.
-- An invalid record for order `1005` with a quantity of `-2`.
+The input contains six rows. After cleaning:
 
-The `clean_orders` task:
+- Duplicate order `1002` is reduced to one row.
+- Invalid order `1005` is removed.
+- Four valid orders remain.
+- Product details are joined from the API.
+- Revenue is calculated from quantity and API price.
+- The enriched dataset is stored in the SQLite table `orders`.
+- SQL analytics prints total revenue, revenue by category, and the top product.
 
-1. Removes the duplicate order.
-2. Removes the invalid order.
-3. Joins the remaining orders to product data from the API.
-4. Calculates `revenue` as `quantity * price`.
-5. Writes the enriched data to `clean_orders.csv`.
+Because product prices come from an external API, exact revenue values can change if the API data changes.
 
-The final dataset has this schema:
+## Kestra concepts demonstrated
 
-```text
-order_id,product_id,quantity,title,category,price,revenue
-```
+### Orchestration
 
-The output contains four valid orders. Because product prices are retrieved from the API at execution time, exact revenue totals may change if the API data changes.
+Python performs cleaning and transformation. SQLite stores structured data. SQL produces analytics. Kestra coordinates the complete workflow:
 
-## Kestra concepts
+- When the pipeline runs
+- Which task runs first
+- How task outputs move downstream
+- Whether a failed task should retry
+- What happens after retries are exhausted
+- Where to inspect execution logs and task outputs
 
-### Flows, tasks, executions, and logs
+### Task outputs and artifacts
 
-- A **flow** defines the complete workflow.
-- A **task** performs one operation in the flow.
-- An **execution** is one run of the flow.
-- **Logs** and the **Gantt view** show what ran, what succeeded, and where a failure occurred.
-
-### Passing task outputs
-
-Kestra makes task results available to downstream tasks through expressions:
+Use explicit output references rather than assuming that a local file created by one task is available in another task:
 
 ```text
 {{ outputs.create_orders.uri }}
 {{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}
+{{ outputs.load_to_database.outputFiles['ecommerce.db'] }}
 ```
-
-This connects tasks without requiring separate local file-management steps.
-
-### Multi-source enrichment
-
-The orders and product API have different schemas:
-
-```text
-Orders:   order_id, product_id, quantity
-Products: id, title, category, price
-```
-
-The pipeline renames the API's `id` column to `product_id`, then performs a Pandas left join.
-
-### Data quality
-
-The pipeline demonstrates two simple validation rules:
-
-- Keep one record per `order_id`.
-- Keep only rows where `quantity > 0`.
 
 ### ETL
 
 - **Extract:** create order data and fetch product data from the REST API.
 - **Transform:** parse JSON, validate, deduplicate, join, enrich, and calculate revenue.
-- **Load:** write the transformed result to `clean_orders.csv`.
+- **Load:** write the transformed records into SQLite as the `orders` table.
+
+### Reliability and observability
+
+- **Scheduling:** starts executions automatically.
+- **Retries:** recover from temporary failures.
+- **Error handling:** logs an alert after retries are exhausted.
+- **Logs:** show task output and error details.
+- **Executions:** show each run and its status.
+- **Gantt view:** shows task timing and dependencies.
 
 ## Troubleshooting lessons
 
-### Kestra expression error: `Function or Macro [json] does not exist`
+### `Function or Macro [json] does not exist`
 
-The first API inspection attempt used:
-
-```text
-{{ json(outputs.fetch_product_data.body).products[0].title }}
-```
-
-That expression failed because `json()` was not available in this flow. The working expression uses `jq`:
+Use `jq` to inspect fields in the API response:
 
 ```text
 {{ outputs.fetch_product_data.body | jq('.products[0].title') | first }}
 ```
 
-### Pandas error: `KeyError: 'product'`
+### `KeyError: 'product'`
 
-The first version of the pipeline used a `product` column in the orders CSV. After moving product data to the API, the API provided the product name as `title` instead.
+The API uses `title` for the product name. Update downstream code from `df["product"]` to `df["title"]` when the upstream schema changes.
 
-The analytics task still used `df["product"]`, so Pandas raised `KeyError: 'product'`. Updating it to `df["title"]` fixed the schema mismatch.
+### `Unrecognized field "maxAttempt"`
 
-This illustrates an important production lesson: whenever an upstream schema changes, review every downstream task that consumes it.
+Use the plural property:
+
+```yaml
+maxAttempts: 3
+```
+
+A configuration or validation error occurs before execution starts. A runtime error occurs after the flow has started. Checking which kind of error occurred helps narrow the investigation.
+
+### SQLite file is not available downstream
+
+A file created inside one script task is not a reliable downstream dependency by itself. Declare it explicitly:
+
+```yaml
+outputFiles:
+  - "ecommerce.db"
+```
+
+Then reference it with:
+
+```text
+{{ outputs.load_to_database.outputFiles['ecommerce.db'] }}
+```
 
 ## Limitations and next steps
 
 The current version is an educational local pipeline. It does not yet include:
 
-- Loading data into a SQL database.
-- Scheduled automatic executions.
-- Retries and structured failure handling.
-- Notifications.
+- Data quality checks that fail the flow when invalid data survives transformation.
+- A production database or warehouse.
+- Incremental loading, upserts, or CDC.
+- Notifications through email, Slack, or Teams.
 - A dashboard or BI layer.
-- Production deployment.
+- Production deployment and secrets management.
 
-Planned progression:
+The next milestone is **data quality**. Planned checks include:
 
 ```text
-Current:  Extract → Transform → CSV artifact
-
-Next:     Extract → Transform → Load to SQL database
-
-Later:    Scheduling → Retries → Failure handling → Notifications → BI
+duplicate order_id → invalid
+quantity <= 0       → invalid
+price IS NULL       → invalid
+product_id IS NULL  → invalid
+revenue < 0         → invalid
 ```
 
-This README will grow as additional pipeline features and learning examples are added.
+The key lesson for the next stage is:
 
----
+```text
+Pipeline technically succeeded ≠ Data is necessarily correct
+```
 
 ## Author
 
