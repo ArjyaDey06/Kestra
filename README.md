@@ -1,48 +1,32 @@
-# Kestra E-Commerce Data Engineering Pipeline
+# 🚀 Kestra E-Commerce Data Engineering Pipeline
 
-A beginner-friendly, hands-on project for learning [Kestra](https://kestra.io/) by building an e-commerce data pipeline from ingestion to SQL analytics.
+<div align="center">
 
-The project demonstrates:
+  <img src="https://img.shields.io/badge/Kestra-Data%20Pipeline-5A67D8?style=for-the-badge&logo=docker" alt="Kestra" />
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python" alt="Python" />
+  <img src="https://img.shields.io/badge/SQLite-Database-003B57?style=for-the-badge&logo=sqlite" alt="SQLite" />
+  <img src="https://img.shields.io/badge/SQL-Analytics-FFB300?style=for-the-badge&logo=postgresql" alt="SQL" />
+  <img src="https://img.shields.io/badge/Docker-Local%20Setup-2496ED?style=for-the-badge&logo=docker" alt="Docker" />
 
-- CSV and REST API ingestion
-- Data cleaning and validation
-- Multi-source joins and enrichment
-- Python and Pandas transformations
-- SQLite database loading
-- SQL analytics
-- Scheduled executions
-- Retries and failure handling
-- Kestra outputs, logs, executions, and observability
+  <p>
+    <strong>A beginner-friendly, hands-on project for learning <a href="https://kestra.io/">Kestra</a> by building an e-commerce data pipeline from ingestion to SQL analytics.</strong>
+  </p>
 
-> **Current checkpoint:** Extract, Transform, Load, SQLite, SQL analytics, scheduling, retries, failure handling, artifact management, and observability are complete. Data quality checks are the next planned feature.
+</div>
 
-## Table of contents
+> ✨ Current checkpoint: Extract, Transform, Load, SQLite, SQL analytics, scheduling, retries, failure handling, artifact management, and observability are complete. Data quality checks are now the next milestone.
 
-- [Project overview](#project-overview)
-- [Architecture](#architecture)
-- [Learning path](#learning-path)
-- [Prerequisites](#prerequisites)
-- [Run Kestra locally](#run-kestra-locally)
-- [Part 1: Build the enriched CSV pipeline](#part-1-build-the-enriched-csv-pipeline)
-- [Part 2: Load SQLite and add reliability](#part-2-load-sqlite-and-add-reliability)
-- [Current working flow](#current-working-flow)
-- [Expected results](#expected-results)
-- [Kestra concepts](#kestra-concepts)
-- [Troubleshooting lessons](#troubleshooting-lessons)
-- [Limitations and next steps](#limitations-and-next-steps)
-- [Author](#author)
+## 🌟 Project overview
 
-## Project overview
+We act as data engineers for an e-commerce company with two sources:
 
-We act as data engineers for an e-commerce company with two sources.
-
-### Orders CSV
+### 🧾 Orders CSV
 
 ```text
 order_id,product_id,quantity
 ```
 
-### Product REST API
+### 🌐 Product REST API
 
 Product details come from the [DummyJSON Products API](https://dummyjson.com/products):
 
@@ -56,7 +40,19 @@ The pipeline matches `orders.product_id` with `products.id`, then produces enric
 order_id, product_id, quantity, title, category, price, revenue
 ```
 
-## Architecture
+## 🧠 What this project demonstrates
+
+- 📥 CSV and REST API ingestion
+- 🧹 Data cleaning and validation
+- 🔗 Multi-source joins and enrichment
+- 🐍 Python and Pandas transformations
+- 💾 SQLite database loading
+- 📊 SQL analytics
+- ⏱️ Scheduled executions
+- 🔁 Retries and failure handling
+- 📦 Kestra outputs, logs, executions, and observability
+
+## 🏗️ Architecture
 
 ```text
 Orders CSV ───────────────┐
@@ -87,7 +83,7 @@ DummyJSON API ──► fetch_product_data
                     sql_analytics
                           │
                           ▼
-                   Business insights
+                  Business insights
                           │
                           ▼
                    processing_complete
@@ -99,7 +95,17 @@ If the API or another task fails:
 The complete flow can also be started automatically by a two-minute schedule.
 ```
 
-## Learning path
+## 🛠️ Tech stack
+
+- 🐍 Python
+- 🧩 Kestra
+- 🗃️ SQLite
+- 📊 SQL
+- 🐳 Docker Desktop
+- 🌐 REST API integration
+- 🧪 Pandas for ETL
+
+## 📚 Learning path
 
 The project was built incrementally so each stage introduces one concept:
 
@@ -120,7 +126,7 @@ The project was built incrementally so each stage introduces one concept:
 15. Add a flow-level error handler for unrecoverable failures.
 16. Expose `ecommerce.db` as an output artifact for downstream tasks.
 
-## Prerequisites
+## ✅ Prerequisites
 
 - Windows
 - Docker Desktop
@@ -129,7 +135,7 @@ The project was built incrementally so each stage introduces one concept:
 
 A Docker account is not required for this local setup.
 
-## Run Kestra locally
+## ▶️ Run Kestra locally
 
 1. Install and start [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
 2. Wait until the Docker Engine is running.
@@ -155,7 +161,7 @@ A Docker account is not required for this local setup.
 5. Open [http://localhost:8080](http://localhost:8080).
 6. Create the local administrator account when prompted.
 
-## Part 1: Build the enriched CSV pipeline
+## 🧩 Part 1: Build the enriched CSV pipeline
 
 Part 1 builds the Extract and Transform stages:
 
@@ -186,7 +192,7 @@ revenue = quantity × price
 
 At the end of Part 1, the transformed data is available as `clean_orders.csv`. Part 2 loads that artifact into SQLite and adds operational reliability.
 
-## Part 2: Load SQLite and add reliability
+## 💾 Part 2: Load SQLite and add reliability
 
 ### 1. Test SQLite first
 
@@ -272,7 +278,7 @@ The expression below passes the CSV artifact from the previous task:
 {{ outputs.clean_orders.outputFiles['clean_orders.csv'] }}
 ```
 
-`if_exists: replace` is useful while learning because every run creates a predictable table from the latest transformed data. Production pipelines may instead use append, upsert, merge, incremental loading, or change-data-capture patterns.
+`if_exists: replace` is useful while learning because every run creates a predictable table from the latest transformed data. Production pipelines may instead use append, upsert, merge, incremental patterns, or warehouse-specific loaders.
 
 The `outputFiles` declaration is important. It tells Kestra to store the database file as a task artifact so that downstream tasks can consume it explicitly.
 
@@ -385,7 +391,7 @@ To observe the behavior safely:
 4. Watch the task fail, wait, retry, and eventually exhaust its attempts.
 5. Restore `https://dummyjson.com/products` afterward.
 
-> **Important:** The property is `maxAttempts`, not `maxAttempt`. The singular form causes a flow validation error before execution starts.
+> ⚠️ Important: The property is `maxAttempts`, not `maxAttempt`. The singular form causes a flow validation error before execution starts.
 
 ### 6. Add failure handling
 
@@ -427,7 +433,7 @@ Task fails → retry → retry → retries exhausted → pipeline_failed
 
 In a production workflow, the error handler could send an email or Slack message, create an incident, record failure metadata, or trigger a recovery workflow. Here it writes an alert to the Kestra logs.
 
-## Current working flow
+## 🔄 Current working flow
 
 Use this flow as the Part 2 checkpoint. It includes the complete pipeline, SQLite loading, SQL analytics, retries, failure handling, and scheduling.
 
@@ -582,9 +588,9 @@ triggers:
     cron: "*/2 * * * *"
 ```
 
-To run it manually, create or open the namespace `dsa.dataengineering`, create the flow `ecommerce_pipeline`, paste the YAML, save it, and select **Execute**. To test scheduling, leave the trigger enabled and watch the executions page.
+To run it manually, create or open the namespace `dsa.dataengineering`, create the flow `ecommerce_pipeline`, paste the YAML, save it, and select **Execute**. To test scheduling, leave the trigger enabled and allow the cron scheduler to create runs automatically.
 
-## Expected results
+## 📈 Expected results
 
 The input contains six rows. After cleaning:
 
@@ -598,7 +604,7 @@ The input contains six rows. After cleaning:
 
 Because product prices come from an external API, exact revenue values can change if the API data changes.
 
-## Kestra concepts demonstrated
+## 🧠 Kestra concepts demonstrated
 
 ### Orchestration
 
@@ -636,7 +642,7 @@ Use explicit output references rather than assuming that a local file created by
 - **Executions:** show each run and its status.
 - **Gantt view:** shows task timing and dependencies.
 
-## Troubleshooting lessons
+## 🐞 Troubleshooting lessons
 
 ### `Function or Macro [json] does not exist`
 
@@ -675,7 +681,7 @@ Then reference it with:
 {{ outputs.load_to_database.outputFiles['ecommerce.db'] }}
 ```
 
-## Limitations and next steps
+## 🚧 Limitations and next steps
 
 The current version is an educational local pipeline. It does not yet include:
 
@@ -702,6 +708,12 @@ The key lesson for the next stage is:
 Pipeline technically succeeded ≠ Data is necessarily correct
 ```
 
-## Author
+## 👨‍💻 Author
 
 **Arjya Dey**
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for learning data engineering with Kestra.</sub>
+</p>
